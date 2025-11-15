@@ -3,7 +3,7 @@ import db from '../db';
 import { Invoice } from '../types/invoice';
 import axios from 'axios';
 import { promises as fs } from 'fs';
-import * as path from 'path';
+
 
 interface InvoiceRow {
   id: string;
@@ -14,19 +14,48 @@ interface InvoiceRow {
 }
 
 class InvoiceService {
-  static async list( userId: string, status?: string, operator?: string): Promise<Invoice[]> {
-    let q = db<InvoiceRow>('invoices').where({ userId: userId });
-    if (status) q = q.andWhereRaw(" status "+ operator + " '"+ status +"'");
+  static async list(userId: string, status?: string, operator?: string) {
+    // Query base
+    let q = db<InvoiceRow>('invoices').where({ userId });
+
+    // 1) Validacion de estado
+    const validStatus = ["paid", "unpaid"];
+
+    if (status != null) {
+      const cleanStatus = status.trim().toLowerCase();
+
+      if (!validStatus.includes(cleanStatus)) {
+        throw new Error("Invalid status value");
+      }
+
+      status = cleanStatus;
+    }
+
+    // 2) Validamos el operador
+    const validOps = ["=", "!=", "<>", ">", "<", ">=", "<="];
+
+    if (operator != null && !validOps.includes(operator)) {
+      throw new Error("Invalid operator");
+    }
+
+    // 3) Query segura
+    if (status && operator) {
+      q = q.where("status", operator, status);
+    }
+
     const rows = await q.select();
-    const invoices = rows.map(row => ({
-      id: row.id,
-      userId: row.userId,
-      amount: row.amount,
-      dueDate: row.dueDate,
-      status: row.status} as Invoice
-    ));
-    return invoices;
+
+    return rows.map(r => ({
+      id: r.id,
+      userId: r.userId,
+      amount: r.amount,
+      dueDate: r.dueDate,
+      status: r.status
+    }));
   }
+
+
+
 
   static async setPaymentCard(
     userId: string,
