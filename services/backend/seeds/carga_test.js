@@ -20,7 +20,7 @@ exports.seed = async function(knex) {
     },{
     username: 'prod',
     email: 'prod@example.local',
-    password: 'password',
+    password: 'TestUser123!',  //cambiamos 
     first_name: 'Prod',
     last_name: 'User',
     activated: true,

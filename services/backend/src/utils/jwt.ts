@@ -1,18 +1,27 @@
-  import jwt from 'jsonwebtoken';
+import jwt from "jsonwebtoken";
 
-  const generateToken = (userId: string) => {
-    return jwt.sign(
-      { id: userId }, 
-      "secreto_super_seguro", 
-      { expiresIn: '1h' }
-    );
-  };
+const SECRET = process.env.JWT_SECRET;
 
-  const verifyToken = (token: string) => {
-    return jwt.verify(token, "secreto_super_seguro");
-  };
+if (!SECRET) {
+  throw new Error("FATAL: Missing JWT_SECRET environment variable");
+}
 
-  export default {
-    generateToken,
-    verifyToken
-  }
+// Tipo del payload del token
+export interface JwtPayload {
+  id: string;
+  iat?: number;
+  exp?: number;
+}
+
+export const generateToken = (userId: string): string => {
+  return jwt.sign({ id: userId }, SECRET, { expiresIn: "1h" });
+};
+
+export const verifyToken = (token: string): JwtPayload => {
+  return jwt.verify(token, SECRET) as JwtPayload;
+};
+
+export default {
+  generateToken,
+  verifyToken
+};

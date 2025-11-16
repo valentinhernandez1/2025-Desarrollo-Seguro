@@ -1,60 +1,93 @@
 // src/services/fileService.ts
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
-import { promisify } from 'util';
 import db from '../db';
 
-const unlink = promisify(fs.unlink);
+// Directorio seguro donde se guardan imágenes de perfil
+const PROFILE_DIR = path.join(process.cwd(), "uploads", "profile");
+
+// safeJoin para evitar Path Traversal
+function safeJoin(base: string, target: string) {
+  const resolved = path.normalize(path.join(base, target));
+  if (!resolved.startsWith(base)) {
+    throw new Error("Invalid path (path traversal)");
+  }
+  return resolved;
+}
 
 class FileService {
-  static async saveProfilePicture(
-    userId: string,
-    file: any //Express.Multer.File
-  ): Promise<string> {
+
+  /* ------------------------------------------
+      GUARDAR FOTO DE PERFIL (SEGURO)
+  -------------------------------------------- */
+  static async saveProfilePicture(userId: string, file: any): Promise<string> {
+
+    // 1. Buscar usuario
     const user = await db('users')
       .select('picture_path')
       .where({ id: userId })
       .first();
+
     if (!user) throw new Error('User not found');
 
+    // 2. Si tiene foto previa → eliminarla
     if (user.picture_path) {
-      try { await unlink(path.resolve(user.picture_path)); } catch { /*ignore*/ }
+      const safeOldPath = safeJoin(PROFILE_DIR, path.basename(user.picture_path));
+      try { await fs.unlink(safeOldPath); } catch { /* ignore */ }
     }
 
+    // 3. Guardar SOLO filename (nunca path)
     await db('users')
-      .update({ picture_path: file.path })
+      .update({ picture_path: file.filename })
       .where({ id: userId });
 
-    return `${process.env.API_BASE_URL}/uploads/${path.basename(file.path)}`;
+    // 4. Devolver URL pública correcta
+    return `${process.env.API_BASE_URL}/uploads/profile/${file.filename}`;
   }
 
+  /* ------------------------------------------
+      OBTENER FOTO DE PERFIL (LECTURA SEGURA)
+  -------------------------------------------- */
   static async getProfilePicture(userId: string) {
     const user = await db('users')
       .select('picture_path')
       .where({ id: userId })
       .first();
-    if (!user || !user.picture_path) throw new Error('No profile picture');
 
-    const filePath = user.picture_path;
-    const stream   = fs.createReadStream(filePath);
-    const ext      = path.extname(filePath).toLowerCase();
+    if (!user || !user.picture_path) {
+      throw new Error('No profile picture');
+    }
+
+    const safePath = safeJoin(PROFILE_DIR, user.picture_path);
+    const fileBuffer = await fs.readFile(safePath);
+
+    // Detectar Content-Type
+    const ext = path.extname(user.picture_path).toLowerCase();
     const contentType =
       ext === '.png'  ? 'image/png'  :
       ext === '.jpg'  ? 'image/jpeg' :
-      ext === '.jpeg'? 'image/jpeg' : 
+      ext === '.jpeg'? 'image/jpeg'  :
       'application/octet-stream';
 
-    return { stream, contentType };
+    return { stream: fileBuffer, contentType };
   }
 
+  /* ------------------------------------------
+      ELIMINAR FOTO DE PERFIL (SEGURO)
+  -------------------------------------------- */
   static async deleteProfilePicture(userId: string) {
     const user = await db('users')
       .select('picture_path')
       .where({ id: userId })
       .first();
-    if (!user || !user.picture_path) throw new Error('No profile picture');
 
-    try { await unlink(path.resolve(user.picture_path)); } catch { /*ignore*/ }
+    if (!user || !user.picture_path) {
+      throw new Error('No profile picture');
+    }
+
+    const safePath = safeJoin(PROFILE_DIR, user.picture_path);
+
+    try { await fs.unlink(safePath); } catch { /* ignore */ }
 
     await db('users')
       .update({ picture_path: null })

@@ -1,7 +1,13 @@
+import "express";
 
-declare namespace Express {
-  export interface Request {
-    /** injected by authMiddleware */
-    user?: { id: string };
+declare global {
+  namespace Express {
+    interface UserPayload {
+      id: string;
+    }
+
+    interface Request {
+      user?: UserPayload;
+    }
   }
 }

@@ -1,26 +1,29 @@
 // knexfile.ts
-import type { Knex } from 'knex';
-import dotenv from 'dotenv';
+import type { Knex } from "knex";
+import path from "path";
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const config: { [key: string]: Knex.Config } = {
-  development: {
-    client: 'pg',
-    connection: {
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'user',
-      password: process.env.DB_PASS || 'password',
-      database: process.env.DB_NAME || 'jwt_api',
-      port: parseInt(process.env.DB_PORT || '5432'),
-    },
-    migrations: {
-      directory: '../migrations',
-    },
-    seeds: {
-      directory: '../seeds',
-    },
+if (!process.env.DB_HOST) throw new Error("Missing DB_HOST");
+if (!process.env.DB_PORT) throw new Error("Missing DB_PORT");
+if (!process.env.DB_USER) throw new Error("Missing DB_USER");
+if (!process.env.DB_PASS) throw new Error("Missing DB_PASS");
+if (!process.env.DB_NAME) throw new Error("Missing DB_NAME");
+
+const config: Knex.Config = {
+  client: "pg",
+  connection: {
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME
   },
+  migrations: {
+    tableName: "knex_migrations",
+    directory: path.resolve(__dirname, "migrations")
+  }
 };
 
 export default config;

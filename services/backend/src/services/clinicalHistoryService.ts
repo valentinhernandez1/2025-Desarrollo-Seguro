@@ -1,10 +1,19 @@
 // src/services/clinicalHistoryService.ts
 import db from '../db';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
-import { promisify } from 'util';
 
-const unlink = promisify(fs.unlink);
+// Directorio seguro donde se guardan archivos
+const BASE_DIR = path.join(process.cwd(), "uploads", "clinical_history");
+
+// safeJoin para evitar Path Traversal
+function safeJoin(base: string, target: string) {
+  const targetPath = path.normalize(path.join(base, target));
+  if (!targetPath.startsWith(base)) {
+    throw new Error("Invalid file path (path traversal detected)");
+  }
+  return targetPath;
+}
 
 interface CHRow {
   id: string;
@@ -26,6 +35,38 @@ interface FileRow {
 }
 
 class ClinicalHistoryService {
+
+  /* ----------------------------------------
+     CREAR HISTORIA CLÍNICA (NECESARIO)
+  ----------------------------------------- */
+  static async create(
+  userId: string,
+  data: { doctorName?: string; diagnose?: string; files?: Array<{ filename: string }> }
+) {
+
+  // Crear registro principal
+  const [h] = await db<CHRow>('clinical_histories')
+    .insert({
+      user_id: userId,
+      doctor_name: data.doctorName || undefined,
+      diagnose: data.diagnose || undefined
+    })
+    .returning("*");
+
+  
+  return {
+    id: h.id,
+    doctorName: h.doctor_name,
+    diagnose: h.diagnose,
+    createdAt: h.created_at,
+    updatedAt: h.updated_at,
+    files: []
+  };
+}
+
+  /* ----------------------------------------------------
+     LISTAR HISTORIA CLÍNICA (SIN EXPONER RUTAS INTERNAS)
+  ----------------------------------------------------- */
   static async list(
     userId: string,
     filters: { from?: Date; to?: Date }
@@ -36,9 +77,9 @@ class ClinicalHistoryService {
 
     const histories = await q.select();
     const ids       = histories.map(h => h.id);
-    const files     = ids.length
-      ? await db<FileRow>('clinical_history_files')
-          .whereIn('history_id', ids)
+
+    const files = ids.length
+      ? await db<FileRow>('clinical_history_files').whereIn('history_id', ids)
       : [];
 
     return histories.map(h => ({
@@ -50,16 +91,18 @@ class ClinicalHistoryService {
       files: files
         .filter(f => f.history_id === h.id)
         .map(f => ({
-          id:           f.id,
-          filename:     f.filename,
-          path:         f.path,
+          id: f.id,
+          filename: f.filename,
           originalName: f.original_name,
-          mimeType:     f.mime_type,
-          size:         f.size,
+          mimeType: f.mime_type,
+          size: f.size
         }))
     }));
   }
 
+  /* -------------------------------------------------------------------
+      OBTENER HISTORIA CLÍNICA POR ID (SIN EXPONER RUTAS INTERNAS)
+  -------------------------------------------------------------------- */
   static async getById(id: string, userId: string) {
     const h = await db<CHRow>('clinical_histories')
       .where({ id, user_id: userId })
@@ -68,6 +111,7 @@ class ClinicalHistoryService {
 
     const files = await db<FileRow>('clinical_history_files')
       .where({ history_id: id });
+
     return {
       id:         h.id,
       doctorName: h.doctor_name,
@@ -77,7 +121,7 @@ class ClinicalHistoryService {
       files: files.map(f => ({
         id:           f.id,
         filename:     f.filename,
-        path:         f.path,
+        path:         undefined, // ✔ No exponer rutas internas
         originalName: f.original_name,
         mimeType:     f.mime_type,
         size:         f.size,
@@ -85,41 +129,20 @@ class ClinicalHistoryService {
     };
   }
 
-  static async create(
-    userId: string,
-    data: any // { doctorName: string; diagnose: string; files: Express.Multer.File[] }
-  ) {
-    const [h] = await db<CHRow>('clinical_histories')
-      .insert({
-        user_id:     userId,
-        doctor_name: undefined, // data.doctorName,
-        diagnose:    undefined //data.diagnose
-      })
-      .returning(['id', 'doctor_name', 'diagnose', 'created_at', 'updated_at']);
-
-    const fileRows = undefined; 
-    /* data.files.map(f => ({
-      history_id:    h.id,
-      filename:      f.filename,
-      path:          f.path,
-      original_name: f.originalname,
-      mime_type:     f.mimetype,
-      size:          f.size
-    }));
-    */
-    await db('clinical_history_files').insert(fileRows);
-
-    return { 
-      id:         h.id,
-      doctorName: h.doctor_name,
-      diagnose:   h.diagnose,
-      createdAt:  h.created_at,
-      updatedAt:  h.updated_at,
-      files: fileRows
-    };
-  }
-
+  /* ------------------------------------------------------
+       ELIMINAR FILE (DE FORMA SEGURA Y SIN TRAVERSAL)
+  -------------------------------------------------------- */
   static async deleteFile(userId: string, historyId: string, filename: string) {
+
+    // Validar input básico para evitar traversal simple
+    if (
+      filename.includes("..") ||
+      filename.includes("/")  ||
+      filename.includes("\\")
+    ) {
+      throw new Error("Invalid filename");
+    }
+
     const h = await db('clinical_histories')
       .where({ id: historyId, user_id: userId })
       .first();
@@ -130,8 +153,18 @@ class ClinicalHistoryService {
       .first();
     if (!f) throw new Error('File not found');
 
-    try { await unlink(path.resolve(f.path)); } catch {}
-    await db('clinical_history_files').where({ id: f.id }).delete();
+    // Ruta segura final
+    const fullPath = safeJoin(BASE_DIR, f.filename);
+
+    // Eliminar archivo
+    try {
+      await fs.unlink(fullPath);
+    } catch {}
+
+    // Eliminar registro
+    await db('clinical_history_files')
+      .where({ id: f.id })
+      .delete();
   }
 }
 

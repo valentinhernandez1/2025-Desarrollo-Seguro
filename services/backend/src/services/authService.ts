@@ -34,7 +34,7 @@ class AuthService {
       // send invite email using nodemailer and local SMTP server
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT),
+      port: parseInt(process.env.SMTP_PORT ?? "0"),
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
@@ -45,11 +45,16 @@ class AuthService {
     const template = `
       <html>
         <body>
-          <h1>Hello ${user.first_name} ${user.last_name}</h1>
+          <h1>Hello <%= first_name %> <%= last_name %></h1> 
           <p>Click <a href="${ link }">here</a> to activate your account.</p>
         </body>
       </html>`;
-    const htmlBody = ejs.render(template);
+    const htmlBody = ejs.render(template, {
+      first_name: user.first_name,
+      last_name: user.last_name,
+      link
+    });
+
     
     await transporter.sendMail({
       from: "info@example.com",

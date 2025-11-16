@@ -19,15 +19,16 @@ services:
     ports:
       - "5000:3000"
     environment:
+      - JWT_SECRET=mi_clave_segura_2025_ucu_super_larga_aleatoria
       - DB_HOST=postgres
       - DB_USER=user
-      - DB_PASS=password
+      - DB_PASS=UserPassword2025
       - DB_NAME=jwt_api
       - DB_PORT=5432
       - SMTP_HOST=mailhog
       - SMTP_PORT=1025
-      - SMTP_USER=seed
-      - SMTP_PASS=seed
+      - SMTP_USER=test_user
+      - SMTP_PASS=TestPass123!
     restart: unless-stopped
     depends_on:
       postgres:
@@ -46,7 +47,7 @@ services:
     container_name: postgres
     environment:
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: UserPassword2025
       POSTGRES_DB: jwt_api
     ports:
       - "5432:5432"
