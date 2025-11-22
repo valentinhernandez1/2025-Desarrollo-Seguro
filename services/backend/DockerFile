@@ -1,17 +1,15 @@
 FROM node:lts
 
 WORKDIR /app
-COPY health.sh .
-RUN chmod +x health.sh
-RUN  mkdir /invoices/
-COPY resources/ /invoices/
 
-COPY package*.json .
+COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npx tsc --build
+
+# ts-node necesita dependencias
+RUN npm install ts-node typescript
 
 EXPOSE 3000
 
-CMD ["node", "dist/src/index.js"]
+CMD ["npx", "ts-node", "src/index.ts"]

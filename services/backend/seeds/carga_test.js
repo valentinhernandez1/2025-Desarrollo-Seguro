@@ -29,6 +29,18 @@ exports.seed = async function(knex) {
     invite_token: null,
     invite_token_expires: null,
     picture_path: null
+    },{
+    username: 'valen',
+    email: 'valen@example.local',
+    password: '123456',
+    first_name: 'Valen',
+    last_name: 'User',
+    activated: true,
+    reset_password_token: null,
+    reset_password_expires: null,
+    invite_token: null,
+    invite_token_expires: null,
+    picture_path: null
     }
   ]).returning('id');
   
@@ -51,6 +63,11 @@ exports.seed = async function(knex) {
    },{
     userId: usersIds[1].id,
     amount: 99.00,
+    dueDate: new Date('2025-01-01'),
+    status: 'unpaid'
+   },{
+    userId: usersIds[2].id,
+    amount: 150.00,
     dueDate: new Date('2025-01-01'),
     status: 'unpaid'
    }]);

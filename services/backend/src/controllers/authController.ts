@@ -1,17 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import AuthService from '../services/authService';
 import { User } from '../types/user';
+import db from "../db";
 
-
+// ----------------------- PING -----------------------
 const ping = async (req: Request, res: Response, next: NextFunction) => {
-  const { username, password } = req.body;
   try {
-    res.json({"msg":"ok" });
+    res.json({ msg: "ok" });
   } catch (err) {
     next(err);
   }
 };
 
+// ----------------------- LOGIN -----------------------
 const login = async (req: Request, res: Response, next: NextFunction) => {
   const { username, password } = req.body;
   try {
@@ -23,17 +24,18 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+// ----------------------- FORGOT PASSWORD -----------------------
 const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   const { email } = req.body;
   try {
     await AuthService.sendResetPasswordEmail(email);
-    // 204: no content, but client knows email was sent
     res.sendStatus(204);
   } catch (err) {
     next(err);
   }
 };
 
+// ----------------------- RESET PASSWORD -----------------------
 const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   const { token, newPassword } = req.body;
   try {
@@ -44,6 +46,7 @@ const resetPassword = async (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
+// ----------------------- SET PASSWORD -----------------------
 const setPassword = async (req: Request, res: Response, next: NextFunction) => {
   const { token, newPassword } = req.body;
   try {
@@ -54,6 +57,7 @@ const setPassword = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+// ----------------------- CREATE USER -----------------------
 const createUser = async (req: Request, res: Response, next: NextFunction) => {
   const { username, password, email, first_name, last_name } = req.body;
   try {
@@ -64,6 +68,7 @@ const createUser = async (req: Request, res: Response, next: NextFunction) => {
       first_name,
       last_name
     };
+
     const userDB = await AuthService.createUser(user);
     res.status(201).json(userDB);
   } catch (err) {
@@ -71,79 +76,63 @@ const createUser = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+// ----------------------- UPDATE USER -----------------------
 const updateUser = async (req: Request, res: Response, next: NextFunction) => {
   const userId = req.params.id;
   const { username, password, email, first_name, last_name } = req.body;
   try {
-  const user: User = {
+    const user: User = {
       username,
       password,
       email,
       first_name,
       last_name
     };
+
     const userDB = await AuthService.updateUser(user);
-      res.status(201).json(userDB);
+    res.status(201).json(userDB);
   } catch (err) {
     next(err);
   }
 };
 
-/*
-export const getProfile = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = await UserService.getById(req.user!.id);
-    res.json(user);
-  } catch (err) {
-    next(err);
-  }
-};
+// ----------------------- ACTIVATE USER -----------------------
+const activateUser = async (req: Request, res: Response, next: NextFunction) => {
+  const { token, username } = req.query;
 
-export const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
-  const { firstName, lastName } = req.body;
   try {
-    const updated = await UserService.updateProfile(req.user!.id, { firstName, lastName });
-    res.json(updated);
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const getPicture = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { stream, contentType } = await FileService.getProfilePicture(req.user!.id);
-    res.setHeader('Content-Type', contentType);
-    stream.pipe(res);
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const uploadPicture = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+    if (!token || !username) {
+      return res.status(400).send("Missing token or username");
     }
-    const url = await FileService.saveProfilePicture(req.user!.id, req.file);
-    res.json({ url });
+
+    const user = await db("users")
+      .where({ username })
+      .andWhere("invite_token", token)
+      .andWhere("invite_token_expires", ">", new Date())
+      .first();
+
+    if (!user) {
+      return res.status(400).send("Invalid or expired activation token");
+    }
+
+    await db("users")
+      .where({ id: user.id })
+      .update({
+        activated: true,
+        invite_token: null,
+        invite_token_expires: null
+      });
+
+    return res.send(`
+      <h1>Account activated</h1>
+      <p>Your account is now active. You may log in.</p>
+    `);
   } catch (err) {
     next(err);
   }
 };
 
-export const deletePicture = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    await FileService.deleteProfilePicture(req.user!.id);
-    res.sendStatus(204);
-  } catch (err) {
-    next(err);
-  }
-};
-
-*/
-
-
-
+// ----------------------- EXPORT -----------------------
 export default {
   ping,
   login,
@@ -152,4 +141,5 @@ export default {
   setPassword,
   createUser,
   updateUser,
+  activateUser
 };

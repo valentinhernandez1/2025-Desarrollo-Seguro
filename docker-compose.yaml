@@ -38,8 +38,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: sh -c "npx knex --knexfile src/knexfile.ts migrate:latest && cd dist/src/ && node index.js"
-    # command to seed data: npx knex seed:run --knexfile src/knexfile.ts
+    command: sh -c "npx knex --knexfile knexfile.ts migrate:latest && npx ts-node src/index.ts"
+    # command to seed data: npx knex seed:run --knexfile knexfile.ts
     
   #add a postgres service
   postgres:

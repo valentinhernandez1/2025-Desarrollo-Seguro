@@ -5,6 +5,7 @@ import db from '../db';
 import { User,UserRow } from '../types/user';
 import jwtUtils from '../utils/jwt';
 import ejs from 'ejs';
+import { escape } from 'lodash';
 
 const RESET_TTL = 1000 * 60 * 60;         // 1h
 const INVITE_TTL = 1000 * 60 * 60 * 24 * 7; // 7d
@@ -40,8 +41,7 @@ class AuthService {
         pass: process.env.SMTP_PASS
       }
     });
-    const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${user.username}`;
-   
+    const link = `${process.env.BACKEND_URL}/activate-user?token=${invite_token}&username=${user.username}`;
     const template = `
       <html>
         <body>
@@ -50,9 +50,9 @@ class AuthService {
         </body>
       </html>`;
     const htmlBody = ejs.render(template, {
-      first_name: user.first_name,
-      last_name: user.last_name,
-      link
+    first_name: escape(user.first_name),
+    last_name: escape(user.last_name),
+    link
     });
 
     

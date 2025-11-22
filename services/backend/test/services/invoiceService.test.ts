@@ -1,68 +1,69 @@
-import jwt from 'jsonwebtoken';
-import nodemailer from 'nodemailer';
-
 import InvoiceService from '../../src/services/invoiceService';
 import db from '../../src/db';
 import { Invoice } from '../../src/types/invoice';
 
-jest.mock('../../src/db')
-const mockedDb = db as jest.MockedFunction<typeof db>
+jest.mock('../../src/db');
+const mockedDb = db as jest.MockedFunction<typeof db>;
 
+describe('InvoiceService.listInvoices', () => {
 
-describe('AuthService.generateJwt', () => {
-  beforeEach (() => {
-    jest.resetModules();
-  });
-
-  beforeAll(() => {
-  });
-
-  afterAll(() => {
-  });
-
-  it('listInvoices', async () => {
+  it('should handle valid operator', async () => {
     const userId = 'user123';
-    const state = 'paid';
-    const operator = 'eq';
+    const status = 'paid';
+    const operator = '=';
     const mockInvoices: Invoice[] = [
       { id: 'inv1', userId, amount: 100, dueDate: new Date(), status: 'paid' },
       { id: 'inv2', userId, amount: 200, dueDate: new Date(), status: 'paid' }
     ];
-    // mock no user exists
+
+    // Mock chain
     const selectChain = {
       where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      andWhereRaw: jest.fn().mockReturnThis(),
       select: jest.fn().mockResolvedValue(mockInvoices),
     };
+
     mockedDb.mockReturnValue(selectChain as any);
 
-    const invoices = await InvoiceService.list(userId, state, operator);
+    const invoices = await InvoiceService.list(userId, status, operator);
 
-    expect(mockedDb().where).toHaveBeenCalledWith({ userId });
-    expect(mockedDb().andWhereRaw).toHaveBeenCalledWith(" status " + operator +" 'paid'");
-    expect(mockedDb().select).toHaveBeenCalled();
+    expect(selectChain.where).toHaveBeenCalledWith({ userId });
+    expect(selectChain.where).toHaveBeenCalledWith("status", "=", "paid");
+    expect(selectChain.select).toHaveBeenCalled();
     expect(invoices).toEqual(mockInvoices);
   });
 
-  it('listInvoices no state', async () => {
+  it('should throw error for invalid operator', async () => {
     const userId = 'user123';
+    const status = 'paid';
+    const operator = 'invalidOperator';
+
+    await expect(InvoiceService.list(userId, status, operator))
+      .rejects
+      .toThrow("Invalid operator");
+  });
+
+  it('should handle no operator', async () => {
+    const userId = 'user123';
+    const status = 'paid';
+
     const mockInvoices: Invoice[] = [
       { id: 'inv1', userId, amount: 100, dueDate: new Date(), status: 'paid' },
       { id: 'inv2', userId, amount: 200, dueDate: new Date(), status: 'unpaid' }
     ];
-    // mock no user exists
+
     const selectChain = {
       where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
       select: jest.fn().mockResolvedValue(mockInvoices),
     };
-    mockedDb.mockReturnValue(selectChain as any);
-    const invoices = await InvoiceService.list(userId);
 
-    expect(mockedDb().where).toHaveBeenCalledWith({ userId });
-    expect(mockedDb().andWhere).not.toHaveBeenCalled();
-    expect(mockedDb().select).toHaveBeenCalled();
+    mockedDb.mockReturnValue(selectChain as any);
+
+    const invoices = await InvoiceService.list(userId, status);
+
+    expect(selectChain.where).toHaveBeenCalledWith({ userId });
+    // No operator → no extra where()
+    expect(selectChain.where).toHaveBeenCalledTimes(1);
+    expect(selectChain.select).toHaveBeenCalled();
     expect(invoices).toEqual(mockInvoices);
   });
 

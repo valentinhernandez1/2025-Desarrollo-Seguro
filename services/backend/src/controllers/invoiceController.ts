@@ -10,6 +10,13 @@ const listInvoices = async (req: Request, res: Response, next: NextFunction) => 
     const invoices = await InvoiceService.list(id, state,operator);
     res.json(invoices);
   } catch (err) {
+    // Errores de validación deben devolver 400
+    if (err instanceof Error && (
+      err.message === "Invalid status value" || 
+      err.message === "Invalid operator"
+    )) {
+      (err as any).status = 400;
+    }
     next(err);
   }
 };

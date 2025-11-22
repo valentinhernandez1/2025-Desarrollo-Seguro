@@ -47,38 +47,42 @@ class InvoiceService {
 
   /* ---------- LISTAR FACTURAS ---------- */
   static async list(userId: string, status?: string, operator?: string) {
-    let q = db<InvoiceRow>('invoices').where({ userId });
 
-    const validStatus = ["paid", "unpaid"];
-    const validOps = ["=", "!=", "<>", ">", "<", ">=", "<="];
+  const validStatus = ["paid", "unpaid"];
+  const validOps = ["=", "!=", "<>", ">", "<", ">=", "<="];
 
-    if (status != null) {
-      const cleanStatus = status.trim().toLowerCase();
-      if (!validStatus.includes(cleanStatus)) {
-        throw new Error("Invalid status value");
-      }
-      status = cleanStatus;
+  // --- VALIDACIÓN ANTES DE ARMAR LA QUERY ---
+  if (status != null) {
+    const cleanStatus = status.trim().toLowerCase();
+
+    if (!validStatus.includes(cleanStatus)) {
+      throw new Error("Invalid status value");
     }
 
-    if (operator != null && !validOps.includes(operator)) {
-      throw new Error("Invalid operator");
-    }
-
-    if (status && operator) {
-      q = q.where("status", operator, status);
-    }
-
-    const rows = await q.select();
-
-    return rows.map(r => ({
-      id: r.id,
-      userId: r.userId,
-      amount: r.amount,
-      dueDate: r.dueDate,
-      status: r.status
-    }));
+    status = cleanStatus;
   }
 
+  if (operator != null && !validOps.includes(operator)) {
+    throw new Error("Invalid operator");
+  }
+
+  // --- recién ahora armamos la query ---
+  let q = db<InvoiceRow>('invoices').where({ userId });
+
+  if (status && operator) {
+    q = q.where("status", operator, status);
+  }
+
+  const rows = await q.select();
+
+  return rows.map(r => ({
+    id: r.id,
+    userId: r.userId,
+    amount: r.amount,
+    dueDate: r.dueDate,
+    status: r.status
+  }));
+}
   /* ---------- PAGAR FACTURA (SSRF Seguro) ---------- */
   static async setPaymentCard(
     userId: string,
